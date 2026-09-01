@@ -1,0 +1,5 @@
+# 构建产物：用 build.sh / cmd/assetpack 从 assets_src 一键重新生成，不入库
+/assets.zip
+/kdxf-unlock-toolbox.exe
+/KDXF_out/
+*.wprobe
