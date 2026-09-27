@@ -5,8 +5,19 @@ on:
     branches: [main]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "同时发布到 GitHub Releases（不勾选则只上传 Artifact）"
+        type: boolean
+        default: false
+        required: false
+      release_tag:
+        description: "版本标签（可选，如 v1.2.3）。留空时：从标签运行则沿用该标签，否则自动生成 manual-<时间>-<短SHA> 的预发布。标签已存在会更新对应 Release。仅在勾选上面的发布后生效"
+        type: string
+        default: ""
+        required: false
 
-# GITHUB_TOKEN 需要写权限才能在 tag 推送时创建 Release
+# GITHUB_TOKEN 需要写权限才能创建 Release（推送 v* 标签或手动勾选发布时）
 permissions:
   contents: write
 
@@ -14,6 +25,75 @@ jobs:
   build:
     runs-on: windows-latest
     steps:
+      # 发布判定放在最前面：标签填错时几秒内就失败，不用等 Windows 构建跑完
+      # 推送 v* 标签 → 自动发布；手动运行 → 由 Run workflow 页面的勾选框决定
+      - name: 判定是否发布 Release 及版本标签
+        id: meta
+        shell: pwsh
+        env:
+          # 一律经 env 传入，避免把用户输入直接拼进脚本（脚本注入）
+          IS_TAG_PUSH: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') }}
+          MANUAL_RELEASE: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_release }}
+          INPUT_TAG: ${{ inputs.release_tag }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $tag        = ("$env:INPUT_TAG").Trim() -replace '^refs/tags/', ''
+          $publish    = $false
+          $prerelease = $false
+
+          if ($env:IS_TAG_PUSH -eq "true") {
+            # 推送 v* 标签：保持原有的自动发布行为
+            $publish = $true
+            $tag     = "$env:REF_NAME"
+            $reason  = "推送了 $tag 标签，自动发布 Release。"
+          }
+          elseif ($env:MANUAL_RELEASE -eq "true") {
+            $publish = $true
+            if ($tag -eq "") {
+              if ($env:REF_TYPE -eq "tag") {
+                # 直接从某个标签手动运行且没填标签：沿用该标签
+                $tag    = "$env:REF_NAME"
+                $reason = "手动运行并勾选了发布，未填版本标签，沿用当前标签 $tag。"
+              } else {
+                $short      = ("$env:GITHUB_SHA").Substring(0, 7)
+                $tag        = "manual-" + (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + $short
+                $prerelease = $true
+                $reason     = "手动运行并勾选了发布，未填版本标签，自动生成 $tag 并标记为预发布（不抢占 Latest）。"
+              }
+            }
+            else {
+              $bad = ($tag -notmatch '^[A-Za-z0-9][A-Za-z0-9._+/-]*$') -or ($tag -match '\.\.') -or $tag.EndsWith(".lock")
+              if ($bad) {
+                Write-Host "::error::版本标签 '$tag' 不是合法的 Git 标签名：只允许字母、数字和 . _ + / - ，且需以字母或数字开头。"
+                exit 1
+              }
+              $reason = "手动运行并勾选了发布，使用版本标签 $tag。"
+            }
+          }
+          else {
+            $reason = "未勾选“同时发布到 GitHub Releases”（也不是 v* 标签推送），本次只上传 Artifact。"
+          }
+
+          Write-Host "publish=$publish / tag=$tag / prerelease=$prerelease :: $reason"
+
+          Add-Content -Path $env:GITHUB_OUTPUT -Encoding utf8 -Value @(
+            "publish=$($publish.ToString().ToLower())",
+            "tag=$tag",
+            "prerelease=$($prerelease.ToString().ToLower())"
+          )
+
+          if ($publish) { $line = "- Release：✅ 将发布到 **$tag**" } else { $line = "- Release：➖ 本次跳过，只留 Artifact" }
+          Add-Content -Path $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Value @(
+            "### 本次运行计划",
+            "",
+            "- Artifact：kdxf-unlock-toolbox（构建通过后始终上传）",
+            $line,
+            "- 说明：$reason"
+          )
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
@@ -31,14 +111,19 @@ jobs:
           $env:CGO_ENABLED="0"
           go build -trimpath -ldflags "-s -w" -o kdxf-unlock-toolbox.exe .
 
+      # Artifact 始终上传：不勾选发布时，这就是唯一产物
       - uses: actions/upload-artifact@v4
         with:
           name: kdxf-unlock-toolbox
           path: kdxf-unlock-toolbox.exe
 
-      - name: 发布 Release（打 v* 标签时）
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: 发布 Release（推送 v* 标签，或手动勾选发布时）
+        if: steps.meta.outputs.publish == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
           files: kdxf-unlock-toolbox.exe
+          fail_on_unmatched_files: true
           generate_release_notes: true
