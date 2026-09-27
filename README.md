@@ -4,7 +4,7 @@
 **「无SPRD4通用解BL工具」的全套 BAT 流程** 封装成了一个单文件 Windows 可执行程序：
 **`kdxf-unlock-toolbox.exe`（约 35MB）**——双击即用，无需准备任何依赖。
 
-适用机型：紫光展锐 UD710（chip0/chip1/chip2）、T310/ums312 平台机型
+适用机型：紫光展锐 UD710（chip0/chip1/chip2）、T310/ums312、T760/ums9620 平台机型
 （Z1 / X2 / X2Pro / X3Pro / T10 / T20 / C6 / C8 / SA30 / SA30Pro / TX20 / C10系 / Q10 等，SPRD4 被阉割、走 SPRD3 kick 方案的设备）。
 
 ## 内置组件（全部随 exe 自带）
@@ -15,7 +15,7 @@
 | `adb.exe` / `fastboot.exe` | 通用调试桥（含 AdbWinApi/AdbWinUsbApi） |
 | `fastboot_sprd.exe` | 展锐专用 fastboot（get_identifier_token / unlock_bootloader） |
 | `sign.pem`（RSA-4096） | 展锐通用解锁签名私钥 |
-| FDL 文件 | ud710 chip0/1、ud710 chip2、t310(ums312) 三组 |
+| FDL 文件 | ud710 chip0/1、ud710 chip2、t310(ums312)、ums9620(T760, dram1/dram2) 四类 |
 | 紫光驱动 R4.21.3201 | sprdvcom/sprdvmdm/rdavcom/sprdadb（Win10 + Win7/8 两套） |
 
 ## 与原 BAT 方案的对照
@@ -61,7 +61,7 @@
 > 启动时的【操作前检查清单】请务必照做：①拔掉所有无关 USB/安卓设备
 > （adb/fastboot 没有设备区分能力，会误操作到其他手机）；②确认数据已备份。
 
-进阶：`[8]` FDL2 深刷读写模式（ud710 c0c1 / c2 / t310 三组 FDL 内置，
+进阶：`[8]` FDL2 深刷读写模式（ud710 c0c1 / c2 / t310 / ums9620(T760, dram1/dram2) 多组 FDL 内置，
 进去后直接 `path D:\backup` + `r all` 备份）、`[9]` 重新上锁、`[0]` 工具命令行。
 
 输出文件在 exe 旁边的 **`KDXF_out\`**：`identifier_token.txt`（fastboot 原始输出）、

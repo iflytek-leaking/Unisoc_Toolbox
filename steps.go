@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -627,6 +628,8 @@ var fdlSets = []struct {
 	{"UD710 chip0/chip1（Z1/X2/X2Pro/X3Pro/T10/T20 等）", "ud710_c0c1", "0x5500_ud710", "0x9efffe00_ud710"},
 	{"UD710 chip2（SA30/SA30Pro/TX20/C10 系 等）", "ud710_c2", "c2_0x5500", "c2_0x9efffe00"},
 	{"T310 / ums312（Q10）", "t310", "0x5500_t310", "0x9efffe00_t310"},
+	{"T760 / ums9620 dram1（默认，推送失败请换 dram2）", "ums9620", "0x65000800_dram1_ums9620", "0xb4fffe00_dram1_ums9620"},
+	{"T760 / ums9620 dram2（dram1 无法进入时使用）", "ums9620", "0x65000800_dram2_ums9620", "0xb4fffe00_dram2_ums9620"},
 }
 
 func (a *App) stepFDL2() {
@@ -635,19 +638,13 @@ func (a *App) stepFDL2() {
 	for i, s := range fdlSets {
 		fmt.Printf("  [%d] %s\n", i+1, s.name)
 	}
-	choice := readLine("请选择芯片型号 [1-3]: ")
-	idx := -1
-	switch strings.TrimSpace(choice) {
-	case "1":
-		idx = 0
-	case "2":
-		idx = 1
-	case "3":
-		idx = 2
-	default:
+	choice := readLine(fmt.Sprintf("请选择芯片型号 [1-%d]: ", len(fdlSets)))
+	idx, err := strconv.Atoi(strings.TrimSpace(choice))
+	if err != nil || idx < 1 || idx > len(fdlSets) {
 		warn("无效选择。")
 		return
 	}
+	idx--
 	set := fdlSets[idx]
 	f1 := filepath.Join(a.P.FdlRoot, set.dir, set.f1)
 	f2 := filepath.Join(a.P.FdlRoot, set.dir, set.f2)
@@ -663,7 +660,7 @@ func (a *App) stepFDL2() {
 	fmt.Println("       r boot / w boot xx.bin / e userdata / reset")
 	pause("准备好后按回车开始推送 FDL...")
 
-	err := runInteractive(a.P.BinDir, a.P.tool("spd_dump.exe"),
+	err = runInteractive(a.P.BinDir, a.P.tool("spd_dump.exe"),
 		"--wait", "600", "loadfdl", f1, "loadfdl", f2, "exec")
 	if err != nil {
 		explainRunErr("spd_dump.exe", err)
