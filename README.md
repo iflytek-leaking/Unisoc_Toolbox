@@ -110,8 +110,16 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 \
   go build -trimpath -ldflags "-s -w" -o kdxf-unlock-toolbox.exe .
 ```
 
-仓库自带 GitHub Actions（`.github/workflows/build.yml`）：push 自动构建并上传产物，
-打 `v*` 标签自动发 Release。
+仓库自带 GitHub Actions（`.github/workflows/build.yml`）：push 自动构建并上传产物（Artifact），
+打 `v*` 标签自动发 Release。也可以在 **Actions → build → Run workflow** 手动触发：
+
+| 勾选「同时发布到 GitHub Releases」 | 版本标签 | 结果 |
+| --- | --- | --- |
+| 不勾选（默认） | — | 只构建并上传 Artifact |
+| 勾选 | 填 `v1.2.3` | 构建通过后创建 `v1.2.3` Release 并附带 exe |
+| 勾选 | 留空 | 从标签页运行则沿用该标签；否则自动生成 `manual-<时间>-<短SHA>` 并标记为预发布，不抢占 Latest |
+
+标签填错（含空格等非法字符）会在几秒内失败，不会白跑一遍构建；标签已存在则更新对应 Release。
 
 **更新内置组件**：直接替换 `assets_src/` 下对应文件后重新构建即可——
 新驱动放 `assets_src/drivers/*.zip`（自动识别），新工具放 `assets_src/bin/`，
