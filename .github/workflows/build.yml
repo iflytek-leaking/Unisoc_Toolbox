@@ -74,8 +74,8 @@ jobs:
             }
           }
           else {
-            $reason = "未勾选“同时发布到 GitHub Releases”（也不是 v* 标签推送），本次只上传 Artifact。"
-          }
+            $reason = "未勾选「同时发布到 GitHub Releases」（也不是 v* 标签推送），本次只上传 Artifact。"
+          }「
 
           Write-Host "publish=$publish / tag=$tag / prerelease=$prerelease :: $reason"
 
